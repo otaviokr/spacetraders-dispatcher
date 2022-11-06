@@ -1,0 +1,106 @@
+#####################################################################
+## this is a template. All values defined here may not be fit for
+## your environment. Double-check each value and rename this file to
+## docker-compose.yml before using it.
+#####################################################################
+
+version: '3.7'
+services:
+  proxy:
+    build: .
+    container_name: spacetrader-ship-proxy
+    environment:
+      - KAFKA_CONNECTION=kafka:9092
+      - KAFKA_PROTOCOL=tcp
+      - KAFKA_TOPIC_READ=spacetrader_order
+      - KAFKA_TOPIC_WRITE=spacetrader_response
+      - KAFKA_PARTITION_READ=0
+      - KAFKA_PARTITION_WRITE=0
+
+      # USER_TOKEN is the secret token to authenticate in spacetraders API.
+      - USER_TOKEN=a1b2c3d4-e5f6-g7h8-i9j0-k1l2m3n4o5p6
+
+    restart: unless-stopped
+    depends_on:
+      # - prometheus
+      # - jaeger
+      - zookeeper
+      - kafka
+
+  # prometheus:
+  #   image: prom/prometheus:v2.36.1
+  #   container_name: spacetrader-prometheus
+  #   volumes:
+  #     - ./etc/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+  #   ports:
+  #     - '9090:9090'
+  #   command:
+  #     - --config.file=/etc/prometheus/prometheus.yml
+    # logging:
+    #   driver: loki
+    #   options:
+    #     loki-url: 'http://localhost:3100/api/prom/push'
+
+  # grafana:
+  #   image: grafana/grafana
+  #   container_name: spacetrader-grafana
+  #   ports:
+  #     - 3000:3000
+  #   restart: unless-stopped
+  #   environment:
+  #     - GF_SECURITY_ADMIN_USER=admin
+  #     - GF_SECURITY_ADMIN_PASSWORD=grafana
+  #   volumes:
+  #     - ./etc/grafana/provisioning:/etc/grafana/provisioning
+  #   depends_on:
+  #     - prometheus
+  #     - ship
+
+  # jaeger:
+  #   image: jaegertracing/all-in-one:1.33
+  #   container_name: jaeger
+  #   ports:
+  #     - "5775:5775/udp"
+  #     - "5778:5778/udp"
+  #     - "6831:6831/udp"
+  #     - "6832:6832/udp"
+  #     - "9411:9411"
+  #     - "14250:14250"
+  #     - "14268:14268"
+  #     - "14269:14269"
+  #     - "16686:16686"
+  #   environment:
+  #     - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+
+  zookeeper:
+    image: docker.io/bitnami/zookeeper:3.8
+    ports:
+      - "2181:2181"
+    volumes:
+      - "zookeeper_data:/bitnami"
+    environment:
+      - ALLOW_ANONYMOUS_LOGIN=yes
+
+  kafka:
+    image: docker.io/bitnami/kafka:3.2
+    ports:
+      - "29092:29092"
+    volumes:
+      - "kafka_data:/bitnami"
+    environment:
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+      ALLOW_PLAINTEXT_LISTENER: yes
+      KAFKA_CREATE_TOPICS: my_test:1
+      KAFKA_LISTENERS: EXTERNAL_SAME_HOST://:29092,INTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL_SAME_HOST://localhost:29092
+      # KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:9092,EXTERNAL_SAME_HOST://kafka:29092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,EXTERNAL_SAME_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+    depends_on:
+      - zookeeper
+
+volumes:
+  zookeeper_data:
+    driver: local
+  kafka_data:
+    driver: local
